@@ -1,0 +1,35 @@
+﻿# venv / build / cache
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+dist/
+*.egg-info/
+
+# notebooks checkpoints
+.ipynb_checkpoints/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# data / models / logs (do NOT commit dataset or heavy checkpoints)
+data/
+datasets/
+checkpoints/
+runs/
+logs/
+results/*.ckpt
+*.pt
+*.pth
+*.h5
+*.onnx
+
+# secrets
+.env
+.env.*

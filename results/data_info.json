@@ -1,0 +1,16 @@
+{
+  "num_samples": {
+    "train": 3555,
+    "val": 893,
+    "test": 895
+  },
+  "source": "directory_splits",
+  "img_size": [
+    80,
+    80
+  ],
+  "label_range": [
+    0,
+    10
+  ]
+}

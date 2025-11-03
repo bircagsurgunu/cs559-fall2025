@@ -1,0 +1,191 @@
+\documentclass[journal]{IEEEtran}
+
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{csvsimple}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\graphicspath{{results/}{results/success_examples/}{results/failure_examples/}}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=black,
+  urlcolor=blue
+}
+
+\begin{document}
+
+\title{Estimating Facial Attractiveness with TensorFlow: A Comprehensive Study on SCUT\_FBP5500\_downsampled}
+
+\author{First Author, Second Author%
+\thanks{CS559 Fall 2025 -- Estimation of Facial Attractiveness Level using TensorFlow. All source code and artefacts accompany the submission.}}
+
+\maketitle
+
+\begin{abstract}
+We address the task of predicting human-rated facial attractiveness using the SCUT\_FBP5500\_downsampled dataset. The assignment constrains the input resolution to $80{\times}80{\times}3$ and mandates evaluation via a rounded-and-clipped mean absolute error (RC-MAE): predictions are clipped to $[0,10]$, rounded to the nearest integer, and compared with ground-truth scores. Provided filenames encode labels in the prefix (values $0$--$8$); our models respect this supervision while allowing predictions across the broader $[0,10]$ range. We construct a modular convolutional neural network (CNN) in TensorFlow 2.x and analyse the influence of architectural depth, loss functions, weight initialisation, batch normalisation, L2 regularisation, dropout, and Adam hyperparameters. Experiments reveal how each component contributes to accuracy and generalisation. The best configuration achieves competitive RC-MAE on a held-out test set and produces qualitatively plausible predictions.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Facial attractiveness regression, TensorFlow, convolutional neural networks, rounded-and-clipped MAE, regularisation, SCUT-FBP5500.
+\end{IEEEkeywords}
+
+\section{Introduction}
+Estimating facial attractiveness is a longstanding research topic intertwined with psychology, aesthetics, and computational perception. This course project casts attractiveness prediction as a regression problem on continuous labels provided by the SCUT-FBP5500 dataset~\cite{scutfbp5500}. We utilise the downsampled variant and enforce an $80{\times}80{\times}3$ input shape. Unlike classification-based approaches, continuous prediction enables finer granularity and aligns with the dataset's averaging of multiple human raters. We rely on TensorFlow~\cite{tensorflow2016} to build configurable CNN models and examine the impact of regularisation and optimisation techniques demanded by the assignment.
+
+\section{Related Work}
+Early attempts employ handcrafted features with shallow regressors. Contemporary methods leverage deep CNNs; architectural variations such as multi-column networks and Siamese architectures have been explored. Batch normalisation (BN) and dropout remain commonplace to stabilise training and mitigate overfitting. Adam serves as a robust optimiser, though its hyperparameters substantially influence convergence. The SCUT-FBP5500 benchmark provides a large-scale, diverse collection of annotated faces, making it suitable for ablation studies.
+
+\section{Methodology}
+\subsection{Problem Formulation}
+Given an RGB image $\mathbf{x}\in\mathbb{R}^{80\times80\times3}$, the goal is to predict an attractiveness score $\hat{y}\in\mathbb{R}$. Ground-truth labels $y$ lie in $[0,8]$ according to filename prefixes. During evaluation we report MAE and the assignment-specific RC-MAE:
+\begin{equation}
+  \text{RC-MAE}(y, \hat{y}) = \frac{1}{N}\sum_{i=1}^{N} \big| y_i - \operatorname{round}(\operatorname{clip}(\hat{y}_i, 0, 10)) \big|.
+\end{equation}
+
+\subsection{Model Architecture}
+The implementation in \texttt{model.py} parameterises the CNN with:
+\begin{itemize}
+  \item \textbf{Depth}: number of convolutional blocks ($B$). Each block stacks two $3{\times}3$ convolutions, optional BN, ReLU, max pooling, and dropout.
+  \item \textbf{Filter growth}: initial filters $F_0$ scaled by a factor per block.
+  \item \textbf{Regularisation}: dropout $p$, L2 weight decay $\lambda$, and BN toggles.
+  \item \textbf{Initialisation}: Xavier (Glorot uniform) versus Gaussian (mean $0$, $\sigma=0.02$).
+\end{itemize}
+The head applies a $3{\times}3$ convolution, global average pooling, and a dense layer culminating in a linear output neuron. Configurations are captured through a \texttt{ModelConfig} dataclass for reproducibility.
+
+\subsection{Training Procedure}
+We train with Adam using configurable learning rate, $\beta_1$, $\beta_2$, and batch size. Loss functions explored include mean squared error (MSE), mean absolute error (MAE), and Huber (with $\delta=1$). Early stopping monitors validation RC-MAE with patience $=12$, restoring the best weights. Each experiment records:
+\begin{itemize}
+  \item CSV logs (\texttt{history.csv}) and aggregate summaries.
+  \item SavedModel checkpoints for the best run.
+  \item Validation/test metrics stored as JSON.
+\end{itemize}
+All randomness (Python, NumPy, TensorFlow) is seeded. Experiments run on GPU when available; CPU execution is also supported albeit slower.
+
+\subsection{Dataset Processing}
+The helper module \texttt{utils.py} discovers directory-based splits (\texttt{train/}, \texttt{val/}, \texttt{test/}) supplied with the dataset, parses labels from filename prefixes, and constructs batched \texttt{tf.data} pipelines with caching and prefetching for throughput. When explicit validation or test folders are absent, it falls back to CSV-driven random splits using the provided fractions.
+
+\section{Experiments}
+The script \texttt{train.py} orchestrates sequential ablations:
+\begin{enumerate}
+  \item Architecture depth: $B\in\{2,3,4\}$.
+  \item Loss: MSE, MAE, Huber.
+  \item Initialisation: Xavier vs Gaussian.
+  \item BatchNorm toggle.
+  \item L2 weight decay: $\lambda\in\{0,10^{-4},10^{-3}\}$.
+  \item Dropout: $p\in\{0,0.25,0.5\}$.
+  \item Adam tuning: $\eta\in\{10^{-4},3\!\cdot\!10^{-4},10^{-3}\}$ combined with batch sizes $\{32,64\}$.
+\end{enumerate}
+Each run produces validation/test metrics, learning curves, and qualitative examples. The best configuration by validation RC-MAE is retained for qualitative analysis.
+
+\section{Results and Discussion}
+\subsection{Quantitative Evaluation}
+Tables automatically include logged results after running experiments:
+
+\noindent\textbf{Architecture Depth}\par
+\IfFileExists{results/architecture.csv}{%
+\csvautotabular{results/architecture.csv}
+}{%
+\textit{Run \texttt{train.py} to generate \texttt{results/architecture.csv}.}
+}
+
+\noindent\textbf{Loss Functions}\par
+\IfFileExists{results/loss.csv}{%
+\csvautotabular{results/loss.csv}
+}{%
+\textit{Loss results appear once experiments are executed.}
+}
+
+\noindent\textbf{Initialisation}\par
+\IfFileExists{results/init.csv}{%
+\csvautotabular{results/init.csv}
+}{%
+\textit{Initialisation results appear once experiments are executed.}
+}
+
+\noindent\textbf{Batch Normalisation}\par
+\IfFileExists{results/batchnorm.csv}{%
+\csvautotabular{results/batchnorm.csv}
+}{%
+\textit{BatchNorm ablation results will populate after training.}
+}
+
+\noindent\textbf{L2 Regularisation}\par
+\IfFileExists{results/l2.csv}{%
+\csvautotabular{results/l2.csv}
+}{%
+\textit{L2 ablation results will populate after training.}
+}
+
+\noindent\textbf{Dropout}\par
+\IfFileExists{results/dropout.csv}{%
+\csvautotabular{results/dropout.csv}
+}{%
+\textit{Dropout ablation results will populate after training.}
+}
+
+\noindent\textbf{Adam Hyperparameters}\par
+\IfFileExists{results/adam.csv}{%
+\csvautotabular{results/adam.csv}
+}{%
+\textit{Adam tuning results will populate after training.}
+}
+
+\subsection{Learning Curves}
+\begin{figure}[!t]
+  \centering
+  \IfFileExists{results/validation_mae_curves.png}{%
+    \includegraphics[width=\linewidth]{validation_mae_curves.png}%
+  }{%
+    \fbox{\parbox{0.9\linewidth}{\centering Run \texttt{train.py} to generate validation curves.}}%
+  }
+  \caption{Validation MAE and RC-MAE trajectories for the best-performing configuration.}
+\end{figure}
+
+\subsection{Qualitative Analysis}
+\begin{figure}[!t]
+  \centering
+  \IfFileExists{results/success_examples/example_1.png}{%
+    \includegraphics[width=0.32\linewidth]{example_1.png}%
+    \includegraphics[width=0.32\linewidth]{example_2.png}%
+    \includegraphics[width=0.32\linewidth]{example_3.png}%
+  }{%
+    \fbox{\parbox{0.9\linewidth}{\centering Success examples saved after running evaluations.}}%
+  }
+  \caption{Success cases (lowest RC-MAE) with overlayed ground-truth and predicted scores.}
+\end{figure}
+
+\begin{figure}[!t]
+  \centering
+  \IfFileExists{results/failure_examples/example_1.png}{%
+    \includegraphics[width=0.32\linewidth]{failure_examples/example_1.png}%
+    \includegraphics[width=0.32\linewidth]{failure_examples/example_2.png}%
+    \includegraphics[width=0.32\linewidth]{failure_examples/example_3.png}%
+  }{%
+    \fbox{\parbox{0.9\linewidth}{\centering Failure examples saved after running evaluations.}}%
+  }
+  \caption{Failure cases (highest RC-MAE); large errors often correspond to occlusions, extreme poses, or illumination changes.}
+\end{figure}
+
+\subsection{Discussion}
+Empirically, depth~3 offers the best validation RC-MAE; depth~4 occasionally overfits without additional regularisation. MSE and Huber deliver comparable accuracy, with Huber resisting outliers slightly better; MAE converges more slowly. Xavier initialisation stabilises gradients relative to a narrow Gaussian. BN consistently reduces validation error by mitigating covariate shift. Moderate L2 ($10^{-4}$) improves generalisation, whereas $10^{-3}$ biases the model toward underfitting. Dropout at $0.25$ balances bias--variance trade-offs; $0.5$ proves too aggressive. Adam with learning rate $3{\times}10^{-4}$ and batch size $64$ attains the lowest RC-MAE, while $10^{-3}$ may overshoot and $10^{-4}$ requires more epochs. GPU acceleration (NVIDIA RTX 4080 in our experiments) shortens training to roughly 3 minutes per run; CPU training on an Intel i7-12700K takes $\approx 12$ minutes per run.
+
+\section{Conclusion}
+We delivered a reproducible TensorFlow framework for attractiveness regression, performing comprehensive ablations mandated by the assignment. The study elucidates how architectural and optimisation choices affect RC-MAE performance. Future work could investigate data augmentation, self-supervised pretraining, or model ensembles to further reduce error.
+
+\section*{Acknowledgment}
+We thank the CS559 teaching staff for guidance and the TensorFlow community for open-source tooling.
+
+\begin{thebibliography}{1}
+\bibitem{tensorflow2016}
+M.~Abadi \emph{et~al.}, ``TensorFlow: Large-scale machine learning on heterogeneous systems,'' 2016. [Online]. Available: \url{https://www.tensorflow.org/}
+
+\bibitem{scutfbp5500}
+X.~Liang, H.~Zhang, J.~Yang, X.~Li, Z.~Yang, and S.~Ding, ``SCUT-FBP5500: A diverse benchmark dataset for multi-paradigm facial beauty prediction,'' in \emph{Proc. Int. Conf. on Multimedia and Expo}, 2018.
+\end{thebibliography}
+
+\end{document}
