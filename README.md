@@ -1,7 +1,5 @@
 # CS559 Fall 2025 – Facial Attractiveness Regression (TensorFlow)
 
-Authors: `<Insert Names and Bilkent IDs>`
-
 ## Overview
 - Predict continuous attractiveness scores on the range `[0, 10]` from SCUT_FBP5500_downsampled face images.
 - CNN-based regression on `(80, 80, 3)` inputs.
@@ -42,25 +40,6 @@ python train.py --data-root /path/to/SCUT_FBP5500_downsampled --output results
 - `--batch-size`: Override baseline batch size.
 - `--experiments`: Restrict experiments, e.g.\
   `python train.py --data-root ... --experiments architecture dropout`
-
-## Outputs (`results/`)
-- `runs/<run_name>/` – Per-run history, metrics, saved model.
-- `summary.csv` – Aggregated metrics across all runs.
-- `<experiment>.csv` – Metrics per experiment group.
-- `validation_mae_curves.png` – Curves for the best validation RC-MAE run.
-- `success_examples/`, `failure_examples/` – Top qualitative examples on the test set.
-- `best_model_summary.json` – Metadata for the best-performing configuration.
-
-- Seeds set through `utils.set_global_seed`.
-- Early stopping monitors validation RC-MAE (`rounded_clipped_mae`), clipping and rounding predictions in `[0, 10]`.
-- Minor numerical variations may occur across hardware (CPU vs GPU).
-
-## Report
-- Compile IEEE report:
-  ```bash
-  pdflatex report.tex
-  ```
-- Ensure `results/` exists so tables and figures populate when compiling.
 
 ## Citation
 - TensorFlow: M. Abadi *et al.*, “TensorFlow: Large-Scale Machine Learning on Heterogeneous Systems,” 2016.
